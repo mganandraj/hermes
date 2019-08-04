@@ -37,9 +37,6 @@ def parse_args():
     parser = get_parser()
     parser.add_argument("llvm_src_dir", type=str, nargs="?", default="llvm")
     parser.add_argument("llvm_build_dir", type=str, nargs="?", default="llvm_build")
-    
-    parser.add_argument("--use-existing-clone", dest="use_existing_clone", action="store_true")
-    
     parser.add_argument(
         "--build-command",
         type=str,
@@ -47,20 +44,8 @@ def parse_args():
         default=None,
         help="Command to run once cmake finishes",
     )
-    parser.add_argument(
-<<<<<<< HEAD:utils/build_llvm.py
-        "--http-proxy",
-        type=str,
-        dest="http_proxy",
-        default=os.environ.get("HTTP_PROXY", ""),
-    )
     parser.add_argument("--configure-only", dest="configure_only", action="store_true")
-    parser.add_argument("--distribute", action="store_true")
-    parser.add_argument("--32-bit", dest="is_32_bit", action="store_true")
-    parser.add_argument("--enable-asan", dest="enable_asan", action="store_true")
     parser.add_argument(
-=======
->>>>>>> f35a8ec... Migrate configure.sh to python for better Windows usability:utils/build/build_llvm.py
         "--cross-compile-only", dest="cross_compile_only", action="store_true"
     )
     args = parser.parse_args()
@@ -71,17 +56,7 @@ def parse_args():
     if args.cross_compile_only:
         args.build_command += " " + os.path.join("bin", "llvm-tblgen")
     args.build_type = args.build_type or ("MinSizeRel" if args.distribute else "Debug")
-<<<<<<< HEAD:utils/build_llvm.py
-
-    if "Visual Studio" in args.build_system:
-        if args.build_type == "Debug":
-            args.build_command += " /p:Configuration=Debug"
-        else:
-            args.build_command += " /p:Configuration=MinSizeRel"
-
-=======
     args.llvm_build_dir += build_dir_suffix(args)
->>>>>>> f35a8ec... Migrate configure.sh to python for better Windows usability:utils/build/build_llvm.py
     return args
 
 
@@ -96,85 +71,6 @@ def build_git_command(http_proxy):
     return command
 
 
-<<<<<<< HEAD:utils/build_llvm.py
-def run_command(cmd, **kwargs):
-    print("+ " + " ".join(cmd))
-    return subprocess.check_call(cmd, stdout=sys.stdout, stderr=sys.stderr, **kwargs)
-
-
-def main():
-    args = parse_args()
-    build_dir_suffix = ""
-    
-    if not args.configure_only:
-        if args.enable_asan:
-            build_dir_suffix += "_asan"
-        if args.distribute:
-            build_dir_suffix += "_release"
-        if args.is_32_bit:
-            build_dir_suffix += "_32"
-
-    args.llvm_build_dir += build_dir_suffix
-
-    print("Source Dir: {}".format(args.llvm_src_dir))
-    print("Using Build system: {}".format(args.build_system))
-    print("Using Build command: {}".format(args.build_command))
-    print("Build Dir: {}".format(args.llvm_build_dir))
-    print("Build Type: {}".format(args.build_type))
-
-    # if use_existing_clone is true, assume that the llvm source code is already cloned and prepared at args.llvm_src_dir
-    if not args.use_existing_clone:
-
-        git = build_git_command(args.http_proxy)
-
-        if not os.path.exists(args.llvm_src_dir):
-            # If the directory doesn't exist, clone LLVM there.
-            print("Cloning LLVM into {}".format(args.llvm_src_dir))
-            run_command(
-                git
-                + ["clone", "--shallow-since", _LLVM_REV_DATE, "https://github.com/llvm-mirror/llvm.git", args.llvm_src_dir]
-            )
-
-        # Checkout a specific revision in LLVM.
-        run_command(git + ["checkout", _LLVM_REV], cwd=args.llvm_src_dir)
-
-        # Apply small edits to LLVM from patch files.
-        # Check that the respository is clean.
-        try:
-            run_command(git + ["diff-index", "--quiet", "HEAD"], cwd=args.llvm_src_dir)
-        except subprocess.CalledProcessError:
-            raise Exception("llvm dir is dirty (contains uncommitted changes)")
-
-        run_command(
-            git
-            + [
-                "apply",
-                "--ignore-space-change",
-                "--ignore-whitespace",
-                os.path.realpath(
-                    os.path.join(__file__, "..", "llvm-changes-for-hermes.patch")
-                ),
-            ],
-            cwd=args.llvm_src_dir,
-        )
-
-        run_command(
-            git
-            + [
-                "-c",
-                "user.name=nobody",
-                "-c",
-                "user.email='nobody@example.com'",
-                "commit",
-                "-a",
-                "-m",
-                "Patch by Hermes build script",
-            ],
-            cwd=args.llvm_src_dir,
-        )
-
-    # endif - not args.use_existing_clone:
-=======
 def clone_and_patch_llvm(args):
     git = build_git_command(args.http_proxy)
     if not os.path.exists(args.llvm_src_dir):
@@ -230,7 +126,6 @@ def clone_and_patch_llvm(args):
         ],
         cwd=args.llvm_src_dir,
     )
->>>>>>> f35a8ec... Migrate configure.sh to python for better Windows usability:utils/build/build_llvm.py
 
 
 def main():
@@ -251,6 +146,8 @@ def main():
     if args.is_32_bit:
         cmake_flags += ["-DLLVM_BUILD_32_BITS=On"]
     if platform.system() == "Windows":
+        if platform.machine().endswith("64"):
+            cmake_flags += ["-Thost=x64"]
         cmake_flags += ["-DLLVM_INCLUDE_EXAMPLES=Off"]
     if args.enable_asan:
         cmake_flags += ["-DLLVM_USE_SANITIZER=Address"]
