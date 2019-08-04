@@ -12,8 +12,14 @@ else()
   cmake_minimum_required(VERSION 3.6.0)
 endif()
 
+project(Hermes)
+
 include(CheckCXXCompilerFlag)
 include(CheckCXXSourceCompiles)
+
+# This must be consistent with the release_version in
+# android/build.gradle and npm/package.json
+set(HERMES_RELEASE_VERSION 0.1.0)
 
 # Project options.
 set(HERMESVM_GCKIND NONCONTIG_GENERATIONAL
@@ -41,9 +47,6 @@ set(HERMESVM_PROFILER_NATIVECALL OFF CACHE BOOL
 
 set(HERMESVM_INDIRECT_THREADING ${DEFAULT_INTERPRETER_THREADING} CACHE BOOL
   "Enable the indirect threaded interpreter")
-
-set(HERMESVM_GCCELL_ID ${DEFAULT_GCCELL_ID} CACHE BOOL
-  "Include a 64-bit id in every GCCell")
 
 set(HERMESVM_ALLOW_COMPRESSED_POINTERS ON CACHE BOOL
   "Enable compressed pointers. If this is on and the target is a 64-bit build, compressed pointers will be used.")
@@ -123,6 +126,8 @@ endif()
 #
 # cmake -G Ninja -DLLVM_BUILD_DIR=$XXX -DLLVM_SRC_DIR=$YYY
 #
+file(TO_CMAKE_PATH "${LLVM_BUILD_DIR}" LLVM_BUILD_DIR)
+file(TO_CMAKE_PATH "${LLVM_SRC_DIR}" LLVM_SRC_DIR)
 list(APPEND CMAKE_MODULE_PATH "${LLVM_BUILD_DIR}/lib/cmake/llvm/")
 
 # Enable debug mode by default
@@ -131,7 +136,8 @@ if ((NOT GENERATOR_IS_MULTI_CONFIG) AND CMAKE_BUILD_TYPE STREQUAL "")
 endif()
 
 if (HERMES_STATIC_LINK)
-  SET(CMAKE_EXE_LINKER_FLAGS "-static")
+  set(CMAKE_EXE_LINKER_FLAGS "-static")
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 endif()
 
 CHECK_CXX_SOURCE_COMPILES(
@@ -158,7 +164,8 @@ else()
   set(OPTIONAL_GC_SECTIONS "")
 endif()
 
-set(DEFAULT_GCCELL_ID $<$<CONFIG:Debug>:ON>$<$<NOT:$<CONFIG:Debug>>:OFF>)
+# Make the HERMES_RELEASE_VERSION accessible for version printing in C++.
+add_definitions(-DHERMES_RELEASE_VERSION="${HERMES_RELEASE_VERSION}")
 
 add_definitions(-DHERMESVM_GC_${HERMESVM_GCKIND})
 if(HERMESVM_GC_GENERATIONAL_MARKSWEEPCOMPACT)
@@ -178,9 +185,6 @@ if(HERMESVM_PROFILER_NATIVECALL)
 endif()
 if(HERMESVM_INDIRECT_THREADING)
     add_definitions(-DHERMESVM_INDIRECT_THREADING)
-endif()
-if(HERMESVM_GCCELL_ID)
-    add_definitions(-DHERMESVM_GCCELL_ID)
 endif()
 if(HERMESVM_SANITIZE_HANDLES)
     add_definitions(-DHERMESVM_SANITIZE_HANDLES)
@@ -324,9 +328,6 @@ if (NOT ICU_FOUND)
     list(REMOVE_DUPLICATES ICU_RPATH)
     message("icu dir: ${ICU_RPATH}")
     include_directories(${ICU_INCLUDE_DIRS})
-
-    # FindICU does not appear to support finding static libraries, so...
-    string(REPLACE .so .a ICU_STATIC_LIBRARIES "${ICU_LIBRARIES}")
   endif()
 endif()
 
@@ -355,10 +356,9 @@ endif()
 # This adds the correct -rpath link flag as necessary.
 function(hermes_link_icu target_name)
   get_target_property(target_type ${target_name} TYPE)
+  target_link_libraries(${target_name} PRIVATE ${ICU_LIBRARIES})
   if (HERMES_STATIC_LINK AND target_type MATCHES "EXECUTABLE|STATIC_LIBRARY")
-    target_link_libraries(${target_name} PRIVATE ${ICU_STATIC_LIBRARIES})
-  else()
-    target_link_libraries(${target_name} PRIVATE ${ICU_LIBRARIES})
+    target_link_libraries(${target_name} PRIVATE dl pthread)
   endif()
 
   if (ICU_RPATH)
@@ -489,6 +489,9 @@ set(LLVM_LIT_ARGS "-sv")
 # LLVM_RUNTIME_OUTPUT_INTDIR to our own build dir.
 set(LLVM_LIT_OUTPUT_DIR ${LLVM_BUILD_DIR}/${CMAKE_CFG_INTDIR}/bin)
 
+# Currently, when cross compiling to ARM on Windows host, we don't build some of the tools required for running the tests.
+if (NOT WINDOWS_CROSSCOMPILE_TO_ARM)
+
 add_lit_testsuite(check-hermes "Running the Hermes regression tests"
   ${HERMES_SOURCE_DIR}/test
   ${HERMES_SOURCE_DIR}/unittests
@@ -496,13 +499,12 @@ add_lit_testsuite(check-hermes "Running the Hermes regression tests"
   DEPENDS ${HERMES_TEST_DEPS}
   ARGS ${HERMES_TEST_EXTRA_ARGS}
   )
+
 set_target_properties(check-hermes PROPERTIES FOLDER "Hermes regression tests")
 
-# This is how github release files are built.
+endif()
 
-# This must be consistent with the release_version in
-# android/build.gradle and npm/package.json
-set(HERMES_RELEASE_VERSION 0.1.0)
+# This is how github release files are built.
 
 set(HERMES_GITHUB_DIR ${HERMES_BINARY_DIR}/github)
 string(TOLOWER ${CMAKE_SYSTEM_NAME} HERMES_GITHUB_SYSTEM_NAME)
@@ -530,3 +532,7 @@ add_custom_command(
 add_custom_target(
   github-cli-release
   DEPENDS ${HERMES_GITHUB_DIR}/${HERMES_CLI_GITHUB_FILE})
+
+install(DIRECTORY API/ public/
+  DESTINATION include/hermes
+  FILES_MATCHING PATTERN "*.h")
