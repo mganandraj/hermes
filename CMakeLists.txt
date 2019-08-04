@@ -336,7 +336,7 @@ endif()
 if (NOT ICU_FOUND AND
     WIN32 AND # Windows 32 or 64 bit
     # At least Windows 10 version 1703 (aka Creators Update)
-    NOT ${CMAKE_SYSTEM_VERSION} VERSION_LESS "10.0.15063")
+    (NOT ${CMAKE_SYSTEM_VERSION} VERSION_LESS "10.0.15063" OR CMAKE_SYSTEM_NAME STREQUAL "WindowsStore"))
   add_definitions(-DUSE_WIN10_ICU)
   set(ICU_FOUND 1)
   set(ICU_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/icu_decls)
@@ -440,7 +440,10 @@ if(HERMES_IS_ANDROID)
   set(OPTIONAL_JNI_ONLOAD "-Wl,--undefined=JNI_OnLoad")
 endif()
 
+if (NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
 add_subdirectory(tools)
+endif()
+
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(external)
@@ -481,6 +484,7 @@ set(HERMES_LIT_TEST_PARAMS
   hbc-deltaprep=${HERMES_BINARY_DIR}/bin/hbc-deltaprep
   build_mode=${HERMES_ASSUMED_BUILD_MODE_IN_LIT_TEST}
   exception_on_oom_enabled=${HERMESVM_EXCEPTION_ON_OOM}
+  timelimit_enabled=${HERMESVM_TIMELIMIT}
   )
 
 set(LLVM_LIT_ARGS "-sv")
@@ -488,6 +492,9 @@ set(LLVM_LIT_ARGS "-sv")
 # This is a hack to help LLVM find its own llvm-lit tool, since we had to set
 # LLVM_RUNTIME_OUTPUT_INTDIR to our own build dir.
 set(LLVM_LIT_OUTPUT_DIR ${LLVM_BUILD_DIR}/${CMAKE_CFG_INTDIR}/bin)
+
+# Currently, when cross compiling to ARM on Windows host, we don't build some of the tools required for running the tests.
+if (NOT WINDOWS_CROSSCOMPILE_TO_ARM AND NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
 
 add_lit_testsuite(check-hermes "Running the Hermes regression tests"
   ${HERMES_SOURCE_DIR}/test
@@ -497,6 +504,8 @@ add_lit_testsuite(check-hermes "Running the Hermes regression tests"
   ARGS ${HERMES_TEST_EXTRA_ARGS}
   )
 set_target_properties(check-hermes PROPERTIES FOLDER "Hermes regression tests")
+
+endif()
 
 # This is how github release files are built.
 
@@ -511,6 +520,7 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E make_directory ${HERMES_GITHUB_BUNDLE_DIR})
 add_custom_target(make_bundle_dir DEPENDS ${HERMES_GITHUB_BUNDLE_DIR})
 
+if (NOT CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
 add_custom_command(
   OUTPUT ${HERMES_GITHUB_DIR}/${HERMES_CLI_GITHUB_FILE}
   WORKING_DIRECTORY ${HERMES_GITHUB_BUNDLE_DIR}
@@ -522,7 +532,12 @@ add_custom_command(
   COMMAND
     ${CMAKE_COMMAND} -E tar zcf ${HERMES_GITHUB_DIR}/${HERMES_CLI_GITHUB_FILE} .
 )
+endif()
 
 add_custom_target(
   github-cli-release
   DEPENDS ${HERMES_GITHUB_DIR}/${HERMES_CLI_GITHUB_FILE})
+
+install(DIRECTORY API/hermes API/jsi/jsi public/hermes
+  DESTINATION include/hermes
+  FILES_MATCHING PATTERN "*.h")

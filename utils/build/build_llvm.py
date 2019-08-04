@@ -44,6 +44,7 @@ def parse_args():
         default=None,
         help="Command to run once cmake finishes",
     )
+    parser.add_argument("--configure-only", dest="configure_only", action="store_true") 
     parser.add_argument(
         "--cross-compile-only", dest="cross_compile_only", action="store_true"
     )
@@ -196,19 +197,21 @@ def main():
         env=os.environ,
         cwd=args.llvm_build_dir,
     )
-    # MSBuild needs retries to handle an unexplainable linker error: LNK1000.
-    tries = 3 if "MSBuild" in args.build_command else 1
-    for i in range(tries):
-        try:
-            run_command(args.build_command.split(), cwd=args.llvm_build_dir)
-            break
-        except subprocess.CalledProcessError as e:
-            if i == tries - 1:
-                # If all retries failed, re-throw the last exception
-                raise
-            else:
-                print("Exec failed: {}\nRetrying...".format(str(e)))
-                continue
+
+    if not args.configure_only:
+        # MSBuild needs retries to handle an unexplainable linker error: LNK1000.
+        tries = 3 if "MSBuild" in args.build_command else 1
+        for i in range(tries):
+            try:
+                run_command(args.build_command.split(), cwd=args.llvm_build_dir)
+                break
+            except subprocess.CalledProcessError as e:
+                if i == tries - 1:
+                    # If all retries failed, re-throw the last exception
+                    raise
+                else:
+                    print("Exec failed: {}\nRetrying...".format(str(e)))
+                    continue
 
 
 if __name__ == "__main__":
