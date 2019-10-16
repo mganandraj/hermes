@@ -1,0 +1,3 @@
+[submodule "chrome_inspector/react-native-src"]
+	path = chrome_inspector/react-native-src
+	url = https://github.com/mganandraj/react-native.git
