@@ -493,6 +493,8 @@ add_subdirectory(unittests)
 add_subdirectory(${HERMES_JSI_DIR}/jsi ${CMAKE_CURRENT_BINARY_DIR}/jsi)
 add_subdirectory(API)
 
+add_subdirectory(chrome_inspector)
+
 # Configure the test suites
 #
 list(APPEND HERMES_TEST_DEPS

@@ -13,9 +13,14 @@ set(LLVM_OPTIONAL_SOURCES
   TraceInterpreter.cpp
   TracingRuntime.cpp
   CompileJS.cpp
+  hermesw.cpp
+  ws_session.cpp
   )
 
 set(api_sources
+  hermesw.cpp
+  CompileJS.cpp
+  ws_session.cpp
   hermes.cpp
   DebuggerAPI.cpp
   hermes_tracing_compat.cpp
@@ -25,11 +30,16 @@ add_llvm_library(hermesapi
         ${api_sources}
         LINK_LIBS jsi hermesVMRuntime)
 
+include_directories(../../chrome_inspector/react-native-src/ReactCommon/)
+
 set(hermesapi_compile_flags "")
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR
     "${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
   string(APPEND hermesapi_compile_flags " -Wno-non-virtual-dtor")
 endif()
+
+# Windows
+target_compile_options(hermesapi PUBLIC "/permissive-")
 
 set_property(TARGET hermesapi PROPERTY
   CXX_STANDARD 14)
@@ -59,8 +69,11 @@ add_library(libhermes SHARED ${api_sources})
 target_link_libraries(libhermes
   jsi
   hermesVMRuntime
+  chrome_inspector
   ${CORE_FOUNDATION}
 )
+
+target_compile_options(libhermes PUBLIC "/permissive-")
 
 if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR
     "${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
