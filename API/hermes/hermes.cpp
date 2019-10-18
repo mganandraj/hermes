@@ -49,6 +49,8 @@
 #include "llvm/Support/SHA1.h"
 #include "llvm/Support/raw_os_ostream.h"
 
+#include "CompileJS.h"
+
 #include <atomic>
 #include <limits>
 #include <list>
@@ -2000,7 +2002,7 @@ class HermesMutex : public std::recursive_mutex {
 
 } // namespace
 
-std::unique_ptr<HermesRuntime> makeHermesRuntime(
+__declspec(dllexport) std::unique_ptr<HermesRuntime> makeHermesRuntime(
     const vm::RuntimeConfig &runtimeConfig) {
   // This is insurance against someone adding data members to
   // HermesRuntime.  If on some weird platform it fails, it can be
@@ -2068,6 +2070,132 @@ jsi::Value debugger::Debugger::jsiValueFromHermesValue(vm::HermesValue hv) {
   return impl(runtime_)->valueFromHermesValue(hv);
 }
 #endif
+
+class StringBuffer : public jsi::Buffer {
+ public:
+  static std::shared_ptr<const jsi::Buffer> bufferFromString(
+      std::string &&str) {
+    return std::make_shared<StringBuffer>(std::move(str));
+  }
+
+  StringBuffer(std::string str) : str_(std::move(str)){};
+  size_t size() const override {
+    return str_.size();
+  }
+  const uint8_t *data() const override {
+    return reinterpret_cast<const uint8_t *>(str_.c_str());
+  }
+
+ private:
+  std::string str_;
+};
+
+class DynamicPreparedScriptHermesRuntime
+    : public facebook::jsi::
+          RuntimeDecorator<HermesRuntimeImpl, facebook::jsi::Runtime> {
+ public:
+  DynamicPreparedScriptHermesRuntime(
+      std::unique_ptr<HermesRuntimeImpl> base,
+      std::unique_ptr<facebook::jsi::PreparedScriptStore> prepared_script_store)
+      : facebook::jsi::
+            RuntimeDecorator<HermesRuntimeImpl, facebook::jsi::Runtime>(*base),
+        base_(std::move(base)),
+        prepared_script_store_(std::move(prepared_script_store)) {}
+
+  jsi::Value evaluateJavaScript(
+      const std::shared_ptr<const jsi::Buffer> &source,
+      const std::string &sourceURL) override {
+    jsi::ScriptSignature scriptSignature = {sourceURL, 1};
+    jsi::JSRuntimeSignature runtimeSignature = {"Hermes", 21};
+
+    if (!prepared_script_store_ ||
+        facebook::hermes::HermesRuntime::isHermesBytecode(
+            source->data(), source->size())) {
+      return plain().evaluateJavaScript(source, sourceURL);
+    }
+
+    std::shared_ptr<const jsi::Buffer> hbc_deserialized =
+        prepared_script_store_->tryGetPreparedScript(
+            scriptSignature, runtimeSignature, "hermes");
+
+    std::string errormsg;
+    if (hbc_deserialized &&
+        HermesRuntime::hermesBytecodeSanityCheck(
+            hbc_deserialized->data(), hbc_deserialized->size(), &errormsg)) {
+      return plain().evaluateJavaScript(hbc_deserialized, sourceURL);
+    }
+
+    auto hbc_buffer =
+        std::shared_ptr<jsi::Buffer>(generateByteCode(source, sourceURL));
+    
+	prepared_script_store_->persistPreparedScript(
+        hbc_buffer, scriptSignature, runtimeSignature, "hermes");
+
+    return plain().evaluateJavaScript(hbc_buffer, sourceURL);
+  }
+
+ private:
+  std::unique_ptr<jsi::Buffer> generateByteCode(
+      const std::shared_ptr<const jsi::Buffer> &source,
+      const std::string &sourceURL) {
+    // This could result in a big copy..
+    // but there appears to be components in the compilation pipeline which
+    // assumes null terminated buffer
+    std::string source_str(
+        reinterpret_cast<const char *>(source->data()), source->size());
+
+    auto buffer = std::make_unique<BufferAdapter>(
+        std::make_unique<StringBuffer>(source_str));
+
+    ::hermes::hbc::CompileFlags compileFlags{};
+    compileFlags.optimize = true;
+    compileFlags.debug = false;
+    compileFlags.lazy = false;
+
+    auto bcErr = hbc::BCProviderFromSrc::createBCProviderFromSrc(
+        std::move(buffer), sourceURL, compileFlags);
+
+    if (!bcErr.first) {
+      throw jsi::JSINativeException(std::move(bcErr.second));
+    }
+
+    std::string bytecodestr;
+    llvm::raw_string_ostream bcstream(bytecodestr);
+
+    ::hermes::BytecodeGenerationOptions opts(::hermes::EmitBundle);
+    opts.optimizationEnabled = true;
+    opts.stripDebugInfoSection = true;
+    opts.stripFunctionNames = true;
+
+	// TODO:: -output-source-map reduces the bundle size by another ~30%, but currently it doesn't seem to be doable programmatically.
+
+    hbc::BytecodeSerializer serializer{bcstream, opts};
+    serializer.serialize(
+        *bcErr.first->getBytecodeModule(),
+        llvm::SHA1::hash(llvm::makeArrayRef(
+            reinterpret_cast<const uint8_t *>(source->data()),
+            source->size())));
+
+    // Flush to string.
+    bcstream.flush();
+
+    return std::make_unique<StringBuffer>(std::move(bytecodestr));
+  }
+
+ private:
+  std::unique_ptr<HermesRuntimeImpl> base_;
+  std::unique_ptr<facebook::jsi::PreparedScriptStore> prepared_script_store_;
+}; // namespace hermes
+
+__declspec(dllexport) std::
+    unique_ptr<facebook::jsi::Runtime> makeDynamicPreparedScriptHermesRuntime(
+        std::unique_ptr<facebook::jsi::PreparedScriptStore>
+            prepared_script_store,
+        const ::hermes::vm::RuntimeConfig &runtimeConfig) {
+  return std::make_unique<facebook::hermes::DynamicPreparedScriptHermesRuntime>(
+      std::make_unique<facebook::hermes::HermesRuntimeImpl>(runtimeConfig),
+      std::move(prepared_script_store));
+}
 
 } // namespace hermes
 } // namespace facebook

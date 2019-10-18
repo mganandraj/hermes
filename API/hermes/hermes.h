@@ -15,6 +15,7 @@
 
 #include <hermes/Public/RuntimeConfig.h>
 #include <jsi/jsi.h>
+#include <jsi/ScriptStore.h>
 
 struct HermesTestHelper;
 
@@ -162,7 +163,14 @@ class HermesRuntime : public jsi::Runtime {
   // class in the .cpp file.
 };
 
-std::unique_ptr<HermesRuntime> makeHermesRuntime(
+__declspec(dllexport) std::
+    unique_ptr<facebook::jsi::Runtime> makeDynamicPreparedScriptHermesRuntime(
+        std::unique_ptr<facebook::jsi::PreparedScriptStore>
+            prepared_script_store,
+        const ::hermes::vm::RuntimeConfig &runtimeConfig =
+            ::hermes::vm::RuntimeConfig());
+
+__declspec(dllexport) std::unique_ptr<HermesRuntime> makeHermesRuntime(
     const ::hermes::vm::RuntimeConfig &runtimeConfig =
         ::hermes::vm::RuntimeConfig());
 std::unique_ptr<jsi::ThreadSafeRuntime> makeThreadSafeHermesRuntime(
