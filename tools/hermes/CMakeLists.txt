@@ -9,6 +9,8 @@ set(LLVM_LINK_COMPONENTS
   Support
   )
 
+include_directories(../../etw/)
+
 add_llvm_tool(hermes
   hermes.cpp
   ${ALL_HEADER_FILES}

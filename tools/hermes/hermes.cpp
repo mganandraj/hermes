@@ -22,6 +22,12 @@
 #include "llvm/Support/SHA1.h"
 #include "llvm/Support/Signals.h"
 
+#if defined(_MSC_VER)
+#define NOMINMAX
+#include <windows.h>
+#include <hermes_etw.h>
+#endif
+
 using namespace hermes;
 
 namespace cl {
@@ -162,6 +168,11 @@ static int executeHBCBytecodeFromCL(
 }
 
 int main(int argc, char **argv) {
+
+#if defined(_MSC_VER)
+  EventRegisterHermes_Provider();
+#endif
+
   // Normalize the arg vector.
   llvm::InitLLVM initLLVM(argc, argv);
   // Print a stack trace if we signal out.

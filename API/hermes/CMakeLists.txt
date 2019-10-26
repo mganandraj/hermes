@@ -28,6 +28,8 @@ list(APPEND api_sources ws_session.cpp hermes_dbg.cpp)
 include_directories(../../chrome_inspector/react-native-src/ReactCommon/)
 endif()
 
+include_directories(../../etw/)
+
 add_llvm_library(hermesapi
         ${api_sources}
         LINK_LIBS jsi hermesVMRuntime)

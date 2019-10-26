@@ -51,6 +51,12 @@
 
 #include "CompileJS.h"
 
+#if defined(_MSC_VER)
+#define NOMINMAX
+#include <windows.h>
+#include <hermes_etw.h>
+#endif
+
 #include <atomic>
 #include <limits>
 #include <list>
@@ -283,6 +289,11 @@ class HermesRuntimeImpl final : public HermesRuntime,
         runtime_(*rt_),
 #endif
         crashMgr_(runtimeConfig.getCrashMgr()) {
+
+#if defined(_MSC_VER)
+    EventRegisterHermes_Provider();
+#endif
+
     compileFlags_.optimize = false;
 #ifdef HERMES_ENABLE_DEBUGGER
     compileFlags_.debug = true;
