@@ -80,8 +80,15 @@ set(HERMES_SLOW_DEBUG ON CACHE BOOL
 set(HERMES_STATIC_LINK OFF CACHE BOOL
   "Link Hermes statically. May only work on GNU/Linux.")
 
+set(HERMES_ENABLE_INSPECTOR_WIN OFF CACHE BOOL
+  "Whether the chrome inspector layer should be baked into hermes")
+
 set(HERMES_ENABLE_DEBUGGER OFF CACHE BOOL
   "Build with debugger support")
+
+if(HERMES_ENABLE_INSPECTOR_WIN)
+  set(HERMES_ENABLE_DEBUGGER ON)
+endif()
 
 set(HERMES_FACEBOOK_BUILD OFF CACHE BOOL
     "Build Facebook (rather than open-source) version of Hermes")
@@ -493,7 +500,9 @@ add_subdirectory(unittests)
 add_subdirectory(${HERMES_JSI_DIR}/jsi ${CMAKE_CURRENT_BINARY_DIR}/jsi)
 add_subdirectory(API)
 
+if(HERMES_ENABLE_INSPECTOR_WIN)
 add_subdirectory(chrome_inspector)
+endif()
 
 # Configure the test suites
 #

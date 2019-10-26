@@ -26,7 +26,7 @@ using tcp = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
 namespace websocket =
     boost::beast::websocket; // from <boost/beast/websocket.hpp>
 
-// Report a failure
+// Report a failure	
 void fail(boost::system::error_code ec, char const *what) {
   std::cerr << what << ": " << ec.message() << "\n";
 }

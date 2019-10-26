@@ -10,7 +10,6 @@
 #include <jsi/ScriptStore.h>
 #include <jsi/decorator.h>
 
-#include "CompileJS.h"
 #include "DebuggerAPI.h"
 #include "hermes.h"
 
@@ -231,8 +230,6 @@ class DebugHermesRuntime : public facebook::jsi::RuntimeDecorator<
             facebook::hermes::HermesRuntime,
             facebook::jsi::Runtime>(*base),
         base_(std::move(base)) {
-    base_->getDebugger().setShouldPauseOnScriptLoad(true);
-
     auto adapter =
         std::make_unique<facebook::hermes::inspector::SharedRuntimeAdapter>(
             base_);
