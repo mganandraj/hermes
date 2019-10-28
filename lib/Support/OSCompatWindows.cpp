@@ -361,10 +361,11 @@ std::chrono::microseconds thread_cpu_time() {
   FILETIME exitTime;
   FILETIME kernelTime;
   FILETIME userTime;
-  GetThreadTimes(
-      GetCurrentThread(), &creationTime, &exitTime, &kernelTime, &userTime);
-  return std::chrono::microseconds(
-      fromFileTimeToMicros(kernelTime) + fromFileTimeToMicros(userTime));
+  // GetThreadTimes(
+  //     GetCurrentThread(), &creationTime, &exitTime, &kernelTime, &userTime);
+  // return std::chrono::microseconds(
+  //     fromFileTimeToMicros(kernelTime) + fromFileTimeToMicros(userTime));
+  return std::chrono::microseconds(0);
 }
 
 bool thread_page_fault_count(int64_t *outMinorFaults, int64_t *outMajorFaults) {

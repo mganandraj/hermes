@@ -209,7 +209,7 @@ int32_t weekDay(double t) {
 double localTZA() {
 #ifdef _WINDOWS
 
-  _tzset();
+  //_tzset();
 
   long gmtoff;
   int err = _get_timezone(&gmtoff);
@@ -374,7 +374,7 @@ double daylightSavingTA(double t) {
     return std::numeric_limits<double>::quiet_NaN();
   }
 
-  ::tzset();
+  //::tzset();
 
   // Convert t to seconds and get the actual time needed.
   const double seconds = t / MS_PER_SECOND;

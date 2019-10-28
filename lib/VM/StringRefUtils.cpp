@@ -159,61 +159,64 @@ static inline void freeEncodingConverter(UConverter *converter) {
 
 /// Print given UTF-16 after converting to user's preferred encoding.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, UTF16Ref u16ref) {
-  // Get the converter to print in user's preferred encoding.
-  UErrorCode converterStatus;
-  UConverter *converter = createEncodingConverter(&converterStatus);
 
-  // Check if we did get a converter.
-  if (converter == nullptr) {
-    OS << u_errorName(converterStatus) << "\n";
-    return OS;
-  }
+	OS << u16ref;
 
-  // Create a buffer to hold the output string.
-  char buf[128];
-  // Set number of available bytes.
-  size_t availOut = sizeof(buf) / sizeof(char);
-  char *targetEnd = buf + availOut;
+  //// Get the converter to print in user's preferred encoding.
+  //UErrorCode converterStatus;
+  //UConverter *converter = createEncodingConverter(&converterStatus);
 
-  const UChar *sourceStart = (const UChar *)u16ref.begin();
-  const UChar *sourceEnd = (const UChar *)u16ref.end();
+  //// Check if we did get a converter.
+  //if (converter == nullptr) {
+  //  OS << u_errorName(converterStatus) << "\n";
+  //  return OS;
+  //}
 
-  // We have a limited buffer; we may have to loop to print everything.
-  do {
-    // Set up target pointers.
-    char *targetStart = buf;
-    // Reset the converter status so it won't get confused.
-    converterStatus = U_ZERO_ERROR;
-    // If we are at the end of the source buffer, force flush.
-    UBool flush = (sourceStart == sourceEnd);
+  //// Create a buffer to hold the output string.
+  //char buf[128];
+  //// Set number of available bytes.
+  //size_t availOut = sizeof(buf) / sizeof(char);
+  //char *targetEnd = buf + availOut;
 
-    // Actual conversion done by the ICU library.
-    ucnv_fromUnicode(
-        converter,
-        &targetStart,
-        targetEnd,
-        &sourceStart,
-        sourceEnd,
-        NULL,
-        flush,
-        &converterStatus);
+  //const UChar *sourceStart = (const UChar *)u16ref.begin();
+  //const UChar *sourceEnd = (const UChar *)u16ref.end();
 
-    // If we had any issues other than a buffer overflow, report!
-    if (U_FAILURE(converterStatus) &&
-        (converterStatus != U_BUFFER_OVERFLOW_ERROR)) {
-      OS << u_errorName(converterStatus) << "\n";
+  //// We have a limited buffer; we may have to loop to print everything.
+  //do {
+  //  // Set up target pointers.
+  //  char *targetStart = buf;
+  //  // Reset the converter status so it won't get confused.
+  //  converterStatus = U_ZERO_ERROR;
+  //  // If we are at the end of the source buffer, force flush.
+  //  UBool flush = (sourceStart == sourceEnd);
 
-      // Close the converter before returning.
-      freeEncodingConverter(converter);
-      return OS;
-    }
+  //  // Actual conversion done by the ICU library.
+  //  ucnv_fromUnicode(
+  //      converter,
+  //      &targetStart,
+  //      targetEnd,
+  //      &sourceStart,
+  //      sourceEnd,
+  //      NULL,
+  //      flush,
+  //      &converterStatus);
 
-    // Actual print operation of the buffer.
-    OS << llvm::StringRef(buf, targetStart - buf);
-  } while (converterStatus == U_BUFFER_OVERFLOW_ERROR);
+  //  // If we had any issues other than a buffer overflow, report!
+  //  if (U_FAILURE(converterStatus) &&
+  //      (converterStatus != U_BUFFER_OVERFLOW_ERROR)) {
+  //    OS << u_errorName(converterStatus) << "\n";
 
-  // Close the converter now that we are done with it.
-  freeEncodingConverter(converter);
+  //    // Close the converter before returning.
+  //    freeEncodingConverter(converter);
+  //    return OS;
+  //  }
+
+  //  // Actual print operation of the buffer.
+  //  OS << llvm::StringRef(buf, targetStart - buf);
+  //} while (converterStatus == U_BUFFER_OVERFLOW_ERROR);
+
+  //// Close the converter now that we are done with it.
+  //freeEncodingConverter(converter);
 
   return OS;
 }
