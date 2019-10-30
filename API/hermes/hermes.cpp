@@ -2045,7 +2045,7 @@ __declspec(dllexport) std::unique_ptr<HermesRuntime> makeHermesRuntime(
   return std::move(ret);
 }
 
-std::unique_ptr<jsi::ThreadSafeRuntime> makeThreadSafeHermesRuntime(
+__declspec(dllexport)  std::unique_ptr<jsi::ThreadSafeRuntime> makeThreadSafeHermesRuntime(
     const vm::RuntimeConfig &runtimeConfig) {
 #if defined(HERMESVM_PLATFORM_LOGGING)
   const vm::RuntimeConfig &actualRuntimeConfig =
@@ -2138,8 +2138,8 @@ class DynamicPreparedScriptHermesRuntime
 
     auto hbc_buffer =
         std::shared_ptr<jsi::Buffer>(generateByteCode(source, sourceURL));
-    
-	prepared_script_store_->persistPreparedScript(
+
+    prepared_script_store_->persistPreparedScript(
         hbc_buffer, scriptSignature, runtimeSignature, "hermes");
 
     return plain().evaluateJavaScript(hbc_buffer, sourceURL);
@@ -2178,7 +2178,8 @@ class DynamicPreparedScriptHermesRuntime
     opts.stripDebugInfoSection = true;
     opts.stripFunctionNames = true;
 
-	// TODO:: -output-source-map reduces the bundle size by another ~30%, but currently it doesn't seem to be doable programmatically.
+    // TODO:: -output-source-map reduces the bundle size by another ~30%, but
+    // currently it doesn't seem to be doable programmatically.
 
     hbc::BytecodeSerializer serializer{bcstream, opts};
     serializer.serialize(
@@ -2203,8 +2204,21 @@ __declspec(dllexport) std::
         std::unique_ptr<facebook::jsi::PreparedScriptStore>
             prepared_script_store,
         const ::hermes::vm::RuntimeConfig &runtimeConfig) {
+#if defined(HERMESVM_PLATFORM_LOGGING)
+  const vm::RuntimeConfig &actualRuntimeConfig =
+      runtimeConfig.rebuild()
+          .withGCConfig(runtimeConfig.getGCConfig()
+                            .rebuild()
+                            .withShouldRecordStats(true)
+                            .build())
+          .build();
+#else
+  const vm::RuntimeConfig &actualRuntimeConfig = runtimeConfig;
+#endif
+
   return std::make_unique<facebook::hermes::DynamicPreparedScriptHermesRuntime>(
-      std::make_unique<facebook::hermes::HermesRuntimeImpl>(runtimeConfig),
+      std::make_unique<facebook::hermes::HermesRuntimeImpl>(
+          actualRuntimeConfig),
       std::move(prepared_script_store));
 }
 

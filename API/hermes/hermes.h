@@ -173,7 +173,7 @@ __declspec(dllexport) std::
 __declspec(dllexport) std::unique_ptr<HermesRuntime> makeHermesRuntime(
     const ::hermes::vm::RuntimeConfig &runtimeConfig =
         ::hermes::vm::RuntimeConfig());
-std::unique_ptr<jsi::ThreadSafeRuntime> makeThreadSafeHermesRuntime(
+__declspec(dllexport)  std::unique_ptr<jsi::ThreadSafeRuntime> makeThreadSafeHermesRuntime(
     const ::hermes::vm::RuntimeConfig &runtimeConfig =
         ::hermes::vm::RuntimeConfig());
 } // namespace hermes

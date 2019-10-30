@@ -30,7 +30,7 @@ def parse_args():
     args = parser.parse_args()
     args.llvm_src_dir = os.path.realpath(args.llvm_src_dir)
     args.llvm_build_dir = os.path.realpath(args.llvm_build_dir)
-    args.build_type = args.build_type or ("MinSizeRel" if args.distribute else "Debug")
+    args.build_type = args.build_type or ("RelWithDebInfo" if args.distribute else "Debug")
     args.llvm_build_dir += build_dir_suffix(args)
     return args
 
@@ -118,7 +118,8 @@ def main():
         "-DCMAKE_BUILD_TYPE={}".format(args.build_type),
     ]
     if args.is_32_bit:
-        cmake_flags += ["-DLLVM_BUILD_32_BITS=On"]
+        cmake_flags += ["-DLLVM_BUILD_32_BITS=On -A Win32"]
+    
     if platform.system() == "Windows":
         if platform.machine().endswith("64") and is_visual_studio(args.build_system):
             cmake_flags += ["-Thost=x64"]
@@ -179,6 +180,10 @@ def main():
         env=os.environ,
         cwd=args.llvm_build_dir,
     )
+
+    if args.is_configure_only:
+        sys.exit()
+
     # MSBuild needs retries to handle an unexplainable linker error: LNK1000.
     # Retry the build in case of failures.
     tries = 3

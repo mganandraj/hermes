@@ -41,6 +41,14 @@ set(HERMESVM_GC_GENERATIONAL_MARKSWEEPCOMPACT OFF
   CACHE BOOL
   "HermesVM GC: only allocate into the old generation, mimicking a Mark-Sweep-Compact collector")
 
+# Hermes UWP build (Universal Windows Platform)
+set(IS_UWP OFF CACHE BOOL
+  "Is building for Universal Windows Platform")
+
+if (IS_UWP)
+  add_definitions(-D__IS_UWP__)
+endif()
+
 # Hermes VM opcode stats profiling
 set(HERMESVM_PROFILER_OPCODE OFF CACHE BOOL
   "Enable opcode stats profiling in hermes VM")
@@ -399,6 +407,12 @@ if (NOT ICU_FOUND AND HERMES_ENABLE_WIN10_ICU_FALLBACK AND
   message("Using Windows 10 built-in ICU")
 endif()
 
+if (IS_UWP)
+  set(ICU_FOUND 1)
+  set(ICU_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/icu_decls)
+  include_directories(${ICU_INCLUDE_DIRS})
+endif()
+
 # If we have no ICU, then error out.
 if (NOT HERMES_IS_ANDROID AND NOT ICU_FOUND)
   message(FATAL_ERROR "Unable to find ICU.")
@@ -492,17 +506,26 @@ if(HERMES_IS_ANDROID)
   set(OPTIONAL_JNI_ONLOAD "-Wl,--undefined=JNI_OnLoad")
 endif()
 
+if (NOT IS_UWP)
 add_subdirectory(tools)
+endif()
+
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(external)
+
+if (NOT IS_UWP)
 add_subdirectory(unittests)
+endif()
+
 add_subdirectory(${HERMES_JSI_DIR}/jsi ${CMAKE_CURRENT_BINARY_DIR}/jsi)
 add_subdirectory(API)
 
 if(HERMES_ENABLE_INSPECTOR_WIN)
 add_subdirectory(chrome_inspector)
 endif()
+
+if (NOT IS_UWP)
 
 # Configure the test suites
 #
@@ -594,6 +617,8 @@ add_custom_command(
   COMMAND
     ${CMAKE_COMMAND} -E tar zcf ${HERMES_GITHUB_DIR}/${HERMES_CLI_GITHUB_FILE} .
 )
+
+endif()
 
 add_custom_target(
   github-cli-release

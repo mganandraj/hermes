@@ -74,7 +74,10 @@ def main():
         "-DCMAKE_BUILD_TYPE=" + args.build_type,
     ]
     if args.is_32_bit:
-        cmake_flags += ["-DLLVM_BUILD_32_BITS=On"]
+        cmake_flags += ["-DLLVM_BUILD_32_BITS=On -A Win32"]
+
+    if args.is_uwp:
+        cmake_flags += ["-DIS_UWP=On"]
 
     if (
         platform.system() == "Windows"

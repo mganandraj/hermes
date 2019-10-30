@@ -38,7 +38,7 @@ void hermesLog(const char *componentName, const char *fmt, ...) {
   asl_vlog(NULL, NULL, ASL_LEVEL_NOTICE, fmt, args);
 #elif defined(_MSC_VER)
   if (EventEnabledGENERIC_EVENT()) { // Avoid expensive potentially expensive string formatting if provider not enabled.
-    char buffer[256];
+    char buffer[512];
     vsprintf_s(buffer, fmt, args);
     EventWriteGENERIC_EVENT(
         "generic",

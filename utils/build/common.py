@@ -62,6 +62,8 @@ def get_parser():
     )
     parser.add_argument("--distribute", action="store_true")
     parser.add_argument("--32-bit", dest="is_32_bit", action="store_true")
+    parser.add_argument("--uwp", dest="is_uwp", action="store_true")
+    parser.add_argument("--configure-only", dest="is_configure_only", action="store_true")
     parser.add_argument("--enable-asan", dest="enable_asan", action="store_true")
     return parser
 
@@ -109,4 +111,6 @@ def build_dir_suffix(args):
         build_dir_suffix += "_release"
     if args.is_32_bit:
         build_dir_suffix += "_32"
+    if args.is_uwp:
+        build_dir_suffix += "_uwp"
     return build_dir_suffix
