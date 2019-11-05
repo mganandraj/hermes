@@ -164,16 +164,16 @@ class HermesRuntime : public jsi::Runtime {
 };
 
 __declspec(dllexport) std::
-    unique_ptr<facebook::jsi::Runtime> makeDynamicPreparedScriptHermesRuntime(
+    unique_ptr<facebook::jsi::Runtime> __cdecl makeDynamicPreparedScriptHermesRuntime(
         std::unique_ptr<facebook::jsi::PreparedScriptStore>
             prepared_script_store,
         const ::hermes::vm::RuntimeConfig &runtimeConfig =
             ::hermes::vm::RuntimeConfig());
 
-__declspec(dllexport) std::unique_ptr<HermesRuntime> makeHermesRuntime(
+__declspec(dllexport) std::unique_ptr<HermesRuntime> __cdecl makeHermesRuntime(
     const ::hermes::vm::RuntimeConfig &runtimeConfig =
         ::hermes::vm::RuntimeConfig());
-__declspec(dllexport)  std::unique_ptr<jsi::ThreadSafeRuntime> makeThreadSafeHermesRuntime(
+__declspec(dllexport) std::unique_ptr<jsi::ThreadSafeRuntime> __cdecl makeThreadSafeHermesRuntime(
     const ::hermes::vm::RuntimeConfig &runtimeConfig =
         ::hermes::vm::RuntimeConfig());
 } // namespace hermes
