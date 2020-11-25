@@ -28,11 +28,14 @@ struct DocTests : facebook::jni::JavaClass<DocTests> {
 
     static void registerNatives() {
       javaClassStatic()->registerNatives({
-        makeNativeMethod("nativeGetString", DocTests::nativeGetString)
+        makeNativeMethod("nativeEvalScript", DocTests::nativeEvalScript)
       });
     }
 
-    static std::string nativeGetString(facebook::jni::alias_ref<DocTests> thiz, facebook::jni::alias_ref<facebook::jni::JString> s1) {
+    static std::string nativeEvalScript(facebook::jni::alias_ref<DocTests> thiz, facebook::jni::alias_ref<facebook::jni::JString> jScript) {
+        std::string script = jScript->toStdString();
+        std::string response;
+
         vm::RuntimeConfig config = vm::RuntimeConfig::Builder()
                 .withGCConfig(
                         vm::GCConfig::Builder()
@@ -57,7 +60,7 @@ struct DocTests : facebook::jni::JavaClass<DocTests> {
 
         vm::GCScope gcScope(runtime.get());
 
-        std::string code ("var x='abcd'; x;");
+        // std::string code ("var x='abcd'; x;");
         // code.reserve(256);
 
         auto global = runtime->getGlobal();
@@ -93,7 +96,7 @@ struct DocTests : facebook::jni::JavaClass<DocTests> {
             errs << "Unable to get REPL util function: evaluateLine.\n";
             runtime->printException(
                     outs, runtime->makeHandle(runtime->getThrownValue()));
-            return "1";
+            return "Unable to get REPL util function: evaluateLine";
         }
         auto evaluateLineFn =
                 runtime->makeHandle<vm::JSFunction>(std::move(*callRes));
@@ -113,7 +116,7 @@ struct DocTests : facebook::jni::JavaClass<DocTests> {
                 evaluateLineFn,
                 runtime.get(),
                 global,
-                vm::StringPrimitive::createNoThrow(runtime.get(), code)
+                vm::StringPrimitive::createNoThrow(runtime.get(), script)
                         .getHermesValue(),
                 vm::HermesValue::encodeBoolValue(hasColors))) ==
             vm::ExecutionStatus::EXCEPTION) {
@@ -122,29 +125,24 @@ struct DocTests : facebook::jni::JavaClass<DocTests> {
                               : llvh::outs(),
                     runtime->makeHandle(runtime->getThrownValue()));
             llvh::outs().resetColor();
-            code.clear();
             threwException = true;
         } else {
             resHandle = std::move(*callRes);
         }
 
-        std::string in = s1->toStdString();
-
         if (resHandle->isUndefined()) {
-            code.clear();
-            in.append("undefined");
+            response.append("undefined");
         } else {
             auto stringView = vm::StringPrimitive::createStringView(
                     runtime.get(), vm::Handle<vm::StringPrimitive>::vmcast(resHandle));
-            code.clear();
 
             vm::SmallU16String<32> tmp;
             vm::UTF16Ref result = stringView.getUTF16Ref(tmp);
 
-            in.append(std::string(result.begin(), result.end()));
+            response.append(std::string(result.begin(), result.end()));
         }
 
-        return in.append("..Hello from C++");
+        return response;
     }
 };
 
