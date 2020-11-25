@@ -9,7 +9,7 @@
 //   ./gradlew intl:connectedAndroidTest
 
 plugins {
-  id('com.android.library')
+  id('com.android.application')
   id("de.undercouch.download")
 }
 
@@ -48,7 +48,7 @@ task preparetest262(dependsOn: downloadTest262, type: Copy) {
 
 // TODO: Figure out how to deduplicate this file and intl/build.gradle
 android {
-  compileSdkVersion 24
+  compileSdkVersion 28
 
   defaultConfig {
     minSdkVersion 16
@@ -102,7 +102,9 @@ android {
   sourceSets {
     main {
       java {
-        srcDirs = []
+        srcDirs = [
+                "javasrc"
+        ]
       }
     }
     androidTest {
@@ -119,4 +121,9 @@ android {
       }
     }
   }
+}
+
+dependencies {
+  implementation 'androidx.appcompat:appcompat:1.2.0'
+  implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
 }

@@ -16,8 +16,143 @@
 
 #include <fbjni/fbjni.h>
 
+#include "hermes/VM/Callable.h"
+
+#define C_STRING(x) #x
+
 using namespace ::facebook;
 using namespace ::hermes;
+
+struct DocTests : facebook::jni::JavaClass<DocTests> {
+    static constexpr auto kJavaDescriptor = "Lcom/facebook/hermes/intltest/MainActivity;";
+
+    static void registerNatives() {
+      javaClassStatic()->registerNatives({
+        makeNativeMethod("nativeGetString", DocTests::nativeGetString)
+      });
+    }
+
+    static std::string nativeGetString(facebook::jni::alias_ref<DocTests> thiz, facebook::jni::alias_ref<facebook::jni::JString> s1) {
+        vm::RuntimeConfig config = vm::RuntimeConfig::Builder()
+                .withGCConfig(
+                        vm::GCConfig::Builder()
+                                .withInitHeapSize(32 << 20)
+                                .withMaxHeapSize(512 << 20)
+                                .withSanitizeConfig(vm::GCSanitizeConfig::Builder()
+                                                            .withSanitizeRate(0.0)
+                                                            .withRandomSeed(-1)
+                                                            .build())
+                                .withShouldRecordStats(false)
+                                .build())
+                .withVMExperimentFlags(vm::RuntimeConfig::getDefaultVMExperimentFlags())
+                .withES6Promise(vm::RuntimeConfig::getDefaultES6Promise())
+                .withES6Proxy(vm::RuntimeConfig::getDefaultES6Proxy())
+                .withES6Symbol(vm::RuntimeConfig::getDefaultES6Symbol())
+                .withEnableHermesInternal(true)
+                .withEnableHermesInternalTestMethods(true)
+                .withAllowFunctionToStringWithRuntimeSource(false)
+                .build();
+
+        auto runtime = vm::Runtime::create(config);
+
+        vm::GCScope gcScope(runtime.get());
+
+        std::string code ("var x='abcd'; x;");
+        // code.reserve(256);
+
+        auto global = runtime->getGlobal();
+        auto propRes = vm::JSObject::getNamed_RJS(
+                global, runtime.get(), vm::Predefined::getSymbolID(vm::Predefined::eval));
+        if (propRes == vm::ExecutionStatus::EXCEPTION) {
+            runtime->printException(
+                    llvh::outs(), runtime->makeHandle(runtime->getThrownValue()));
+            return "error getting 'eval' from global";
+        }
+        auto evalFn = runtime->makeHandle<vm::Callable>(std::move(*propRes));
+
+
+        llvh::StringRef evaluateLineString =
+#include "evaluate-line.js"
+        ;
+
+        bool hasColors = true; //oscompat::should_color(STDOUT_FILENO);
+
+        auto callRes = evalFn->executeCall1(
+                evalFn,
+                runtime.get(),
+                global,
+                vm::StringPrimitive::createNoThrow(runtime.get(), evaluateLineString)
+                        .getHermesValue());
+        if (callRes == vm::ExecutionStatus::EXCEPTION) {
+            llvh::raw_ostream &errs = hasColors
+                                      ? llvh::errs().changeColor(llvh::raw_ostream::Colors::RED)
+                                      : llvh::errs();
+            llvh::raw_ostream &outs = hasColors
+                                      ? llvh::outs().changeColor(llvh::raw_ostream::Colors::RED)
+                                      : llvh::outs();
+            errs << "Unable to get REPL util function: evaluateLine.\n";
+            runtime->printException(
+                    outs, runtime->makeHandle(runtime->getThrownValue()));
+            return "1";
+        }
+        auto evaluateLineFn =
+                runtime->makeHandle<vm::JSFunction>(std::move(*callRes));
+
+        runtime->getHeap().runtimeWillExecute();
+
+
+        vm::MutableHandle<> resHandle{runtime.get()};
+
+
+        // Ensure we don't keep accumulating handles.
+        vm::GCScopeMarkerRAII gcMarker{runtime.get()};
+
+        bool threwException = false;
+
+        if ((callRes = evaluateLineFn->executeCall2(
+                evaluateLineFn,
+                runtime.get(),
+                global,
+                vm::StringPrimitive::createNoThrow(runtime.get(), code)
+                        .getHermesValue(),
+                vm::HermesValue::encodeBoolValue(hasColors))) ==
+            vm::ExecutionStatus::EXCEPTION) {
+            runtime->printException(
+                    hasColors ? llvh::outs().changeColor(llvh::raw_ostream::Colors::RED)
+                              : llvh::outs(),
+                    runtime->makeHandle(runtime->getThrownValue()));
+            llvh::outs().resetColor();
+            code.clear();
+            threwException = true;
+        } else {
+            resHandle = std::move(*callRes);
+        }
+
+        std::string in = s1->toStdString();
+
+        if (resHandle->isUndefined()) {
+            code.clear();
+            in.append("undefined");
+        } else {
+            auto stringView = vm::StringPrimitive::createStringView(
+                    runtime.get(), vm::Handle<vm::StringPrimitive>::vmcast(resHandle));
+            code.clear();
+
+            vm::SmallU16String<32> tmp;
+            vm::UTF16Ref result = stringView.getUTF16Ref(tmp);
+
+            in.append(std::string(result.begin(), result.end()));
+        }
+
+        return in.append("..Hello from C++");
+    }
+};
+
+extern "C" jint JNIEXPORT JNICALL JNI_OnLoad(JavaVM *jvm, void *reserved) {
+  return facebook::jni::initialize(jvm, [] {
+      DocTests::registerNatives();
+  });
+}
 
 namespace hermes {
 namespace platform_intl {
