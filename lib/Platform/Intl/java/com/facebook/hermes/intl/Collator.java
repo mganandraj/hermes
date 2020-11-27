@@ -8,6 +8,8 @@
 package com.facebook.hermes.intl;
 
 import android.os.Build;
+import android.util.Log;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -24,6 +26,10 @@ import java.util.Map;
  * <p>Also see the implementer' notes on DateTimeFormat.java.
  */
 public class Collator {
+
+  static {
+    Log.i("Collator", "Testing ...");
+  }
 
   // [[RelevantExtensionKeys]]
   // Ref: https://tc39.es/ecma402/#sec-intl.locale-internal-slots
