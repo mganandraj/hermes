@@ -233,6 +233,7 @@ public class MainActivity extends Activity {
         }
     }
 
+    // TODO : We could have a space separated list of args followed by command .. no need to make it look like function call.
     // Simple silly !!
     static String commandRegex = "^([A-Za-z]+)\\(([a-zA-Z0-9_,]*)\\)$";
     static Pattern commandPattern = Pattern.compile(commandRegex);

@@ -300,4 +300,9 @@ public class Collator {
   public double compare(String source, String target) {
     return mPlatformCollatorObject.compare(source, target);
   }
+
+  @Override
+  protected void finalize() throws Throwable {
+    super.finalize();
+  }
 }

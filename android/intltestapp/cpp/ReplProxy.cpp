@@ -56,6 +56,7 @@ struct ReplWrapper : facebook::jni::HybridClass<ReplWrapper> {
                 .withES6Promise(vm::RuntimeConfig::getDefaultES6Promise())
                 .withES6Proxy(vm::RuntimeConfig::getDefaultES6Proxy())
                 .withES6Symbol(vm::RuntimeConfig::getDefaultES6Symbol())
+                .withES6Intl(true)
                 .withEnableHermesInternal(true)
                 .withEnableHermesInternalTestMethods(true)
                 .withAllowFunctionToStringWithRuntimeSource(false)
