@@ -27,14 +27,10 @@ import com.facebook.jni.HybridData;
 import com.facebook.soloader.SoLoader;
 import com.google.gson.Gson;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.FormatFlagsConversionMismatchException;
-
-import com.facebook.jni.HybridData;
-
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 class DoubleTapReloadRecognizer {
     private boolean mDoEnter = false;
@@ -84,10 +80,9 @@ class DoubleTapReloadRecognizer {
         }
         return false;
     }
-
 }
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
 
     private ListView mScriptListView;
     private EditText mScriptEditText;
@@ -98,6 +93,8 @@ public class MainActivity extends AppCompatActivity {
 
     private HybridData mHybridData;
 
+    private static MainActivity sActivity = null; // UGLY !
+
     DoubleTapReloadRecognizer mDoubleTapReloadRecognizer = new DoubleTapReloadRecognizer();
 
     static {
@@ -107,6 +104,7 @@ public class MainActivity extends AppCompatActivity {
 
     class CustomAdapter extends BaseAdapter {
         private ArrayList<Pair<String, String>> scriptsAndResponses;
+
         private Context context;
 
         public CustomAdapter(Context context) {
@@ -116,6 +114,16 @@ public class MainActivity extends AppCompatActivity {
 
         public void add(String script, String response) {
             scriptsAndResponses.add(new Pair<String, String>(script, response));
+            this.notifyDataSetChanged();
+        }
+
+        public void addEvent(String eventText) {
+            scriptsAndResponses.add(new Pair<String, String>(eventText, ""));
+            this.notifyDataSetChanged();
+        }
+
+        public void addError(String eventText) {
+            scriptsAndResponses.add(new Pair<String, String>("", eventText));
             this.notifyDataSetChanged();
         }
 
@@ -136,21 +144,29 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public View getView(int i, View view, ViewGroup viewGroup) {
-            if (view == null) {
-                view = LayoutInflater.from(context).inflate(R.layout.listview, null);
-            }
-
-            TextView scriptsListView = view.findViewById(R.id.scriptTextView);
-            TextView responseListView = view.findViewById(R.id.responseTextView);
-
             Pair<String, String> scriptAndResponse = (Pair<String, String>) getItem(i);
-            scriptsListView.setText(Html.fromHtml(scriptAndResponse.first));
-            responseListView.setText(Html.fromHtml(scriptAndResponse.second));
+
+            if(scriptAndResponse.second.isEmpty()) { // Hacky .. we treat this case as event.
+                view = LayoutInflater.from(context).inflate(R.layout.listview_event, null);
+                TextView eventsListView = view.findViewById(R.id.eventTextView);
+                eventsListView.setText(Html.fromHtml(scriptAndResponse.first));
+            } else if (scriptAndResponse.first.isEmpty()) { // Hacky .. we treat this case as error.
+                view = LayoutInflater.from(context).inflate(R.layout.listview_error, null);
+                TextView errorListView = view.findViewById(R.id.errorTextView);
+                errorListView.setText(Html.fromHtml(scriptAndResponse.second));
+            }
+            else {
+                view = LayoutInflater.from(context).inflate(R.layout.listview_script, null);
+                TextView scriptsListView = view.findViewById(R.id.scriptTextView);
+                TextView responseListView = view.findViewById(R.id.responseTextView);
+
+                scriptsListView.setText(Html.fromHtml(scriptAndResponse.first));
+                responseListView.setText(Html.fromHtml(scriptAndResponse.second));
+            }
 
             return view;
         }
     }
-
 
     private void popScriptStackUp(EditText scriptEditText) {
         if(mScriptStack.isEmpty())
@@ -192,20 +208,71 @@ public class MainActivity extends AppCompatActivity {
 
     private void evalScript(EditText scriptEditText, ListView scriptListView, CustomAdapter adapter) {
         String script = scriptEditText.getText().toString();
-
-        String result = nativeEvalScript(script);
-        adapter.add(script, result);
-
-        scriptListView.smoothScrollToPosition(adapter.getCount());
-        scriptEditText.setText("");
-
-        mScriptStack.add(script);
-        mScriptStackIndex = mScriptStack.size();
-
-//        InputMethodManager inputManager = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
-//        inputManager.hideSoftInputFromWindow(scriptEditText.getWindowToken(),  0);
     }
 
+    private void runHermesCommand(String command, String[] args) {
+        switch (command) {
+            case "collect": {
+                nativeCollect(args.length > 0 ? args[0] : "User");
+                break;
+            }
+            default:
+                mAdapter.addError("Unknown hermes command: " + command);
+        }
+    }
+
+    private void runDroidCommand(String command, String[] args) {
+        switch (command) {
+            case "collect": {
+                System.gc();
+                mAdapter.addEvent("System.gc() triggered.");
+                break;
+            }
+            default:
+                mAdapter.addError("Unknown droid command: " + command);
+        }
+    }
+
+    // Simple silly !!
+    static String commandRegex = "^([A-Za-z]+)\\(([a-zA-Z0-9_,]*)\\)$";
+    static Pattern commandPattern = Pattern.compile(commandRegex);
+    private void runCommand(String prefix, String command){
+        Matcher commandMatcher = commandPattern.matcher(command);
+        if(!commandMatcher.matches()) {
+            mAdapter.addError("Invalid command: " + command);
+            return;
+        }
+
+        String commandVerb = commandMatcher.group(1);
+        String[] commandArgs = commandMatcher.group(2).split(",");
+
+        if(prefix.equals("hm"))
+            runHermesCommand(commandVerb, commandArgs);
+        else if(prefix.equals("dr"))
+            runDroidCommand(commandVerb, commandArgs);
+        else
+            mAdapter.addError("Unknown prefix: " + prefix);
+    }
+
+    // Eg. commands: "hm:collect()"
+    private void run() {
+        String cmd = mScriptEditText.getText().toString();
+        if(cmd.startsWith("hm:")) {
+            runCommand("hm", cmd.substring("hm:".length()));
+        } else if(cmd.startsWith("dr:")) {
+            runCommand("dr", cmd.substring("hm:".length()));
+        } else {
+            String script = cmd;
+            String result = nativeEvalScript(script);
+            mAdapter.add(script, result);
+
+            mScriptListView.smoothScrollToPosition(mAdapter.getCount());
+            mScriptEditText.setText("");
+
+            mScriptStack.add(script);
+            mScriptStackIndex = mScriptStack.size();
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -226,7 +293,7 @@ public class MainActivity extends AppCompatActivity {
             public boolean onEditorAction(TextView textView, int actionId, KeyEvent keyEvent) {
                 boolean handled = false;
                 if (actionId == EditorInfo.IME_ACTION_DONE) {
-                    evalScript(mScriptEditText, mScriptListView, mAdapter);
+                    run();
                     handled = true;
                 }
                 return handled;
@@ -244,7 +311,7 @@ public class MainActivity extends AppCompatActivity {
             public void onReceive(Context context, Intent intent) {
                 String script = intent.getStringExtra("script");
                 mScriptEditText.setText(script);
-                evalScript(mScriptEditText, mScriptListView, mAdapter);
+                run();
             }
         }, new IntentFilter("com.facebook.hermes.intltest.eval"));
 
@@ -253,7 +320,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 String script = mScriptEditText.getText().toString();
-                evalScript(mScriptEditText, mScriptListView, mAdapter);
+                run();
             }
         });
     }
@@ -261,6 +328,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        sActivity = this;
 
         String scriptStackJson = getPreferences(Context.MODE_PRIVATE).getString("ScriptStack", "");
         String[] scripts = (new Gson()).fromJson(scriptStackJson, String[].class);
@@ -274,6 +342,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        sActivity = null;
 
         String scriptStackJson = (new Gson()).toJson(mScriptStack);
         SharedPreferences.Editor sharedPreferencesEditor = getPreferences(Context.MODE_PRIVATE).edit();
@@ -284,7 +353,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_MENU) {
-            evalScript(mScriptEditText, mScriptListView, mAdapter);
+            run();
         }
 
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
@@ -298,6 +367,18 @@ public class MainActivity extends AppCompatActivity {
         return super.onKeyUp(keyCode, event);
     }
 
-    native String nativeEvalScript(String s);
+    public static void onGCEvent(final String extraInfo) {
+        if(sActivity != null) {
+            sActivity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    sActivity.mAdapter.addEvent("GC: " + extraInfo);
+                }
+            });
+        }
+    }
+
     static native HybridData initHybrid();
+    native String nativeEvalScript(String s);
+    native void nativeCollect(String s);
 }

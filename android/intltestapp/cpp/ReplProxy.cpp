@@ -9,17 +9,34 @@ using namespace ::facebook;
 using namespace ::hermes;
 
 struct ReplWrapper : facebook::jni::HybridClass<ReplWrapper> {
+
+    struct ReplCallback : facebook::jni::JavaClass<ReplCallback> {
+        static constexpr auto kJavaDescriptor = "Lcom/facebook/hermes/intltest/MainActivity;";
+    };
+
     static constexpr auto kJavaDescriptor = "Lcom/facebook/hermes/intltest/MainActivity;";
 
     std::shared_ptr<vm::Runtime> mRuntime;
 
     static void registerNatives() {
         javaClassStatic()->registerNatives({
+                                                   makeNativeMethod("initHybrid",
+                                                                    ReplWrapper::initHybrid),
                                                    makeNativeMethod("nativeEvalScript",
                                                                     ReplWrapper::nativeEvalScript),
-                                                   makeNativeMethod("initHybrid",
-                                                                    ReplWrapper::initHybrid)
+                                                   makeNativeMethod("nativeCollect",
+                                                                    ReplWrapper::nativeCollect)
                                            });
+    }
+
+    void GCCallback(vm::GCEventKind kind, const char *pExtraInfo) {
+        static const auto method =
+                javaClassStatic()->getStaticMethod<void(facebook::jni::local_ref<facebook::jni::JString>)>(
+                        "onGCEvent");
+        std::string info(pExtraInfo);
+        info.append(" : ");
+        info.append(kind == vm::GCEventKind::CollectionStart ? "Start" : "End");
+        method(javaClassStatic(), facebook::jni::make_jstring(info));
     }
 
     ReplWrapper() {
@@ -33,6 +50,7 @@ struct ReplWrapper : facebook::jni::HybridClass<ReplWrapper> {
                                                             .withRandomSeed(-1)
                                                             .build())
                                 .withShouldRecordStats(false)
+                                .withCallback([this](vm::GCEventKind gcEventKind, const char *extraInfo) { GCCallback(gcEventKind, extraInfo); })
                                 .build())
                 .withVMExperimentFlags(vm::RuntimeConfig::getDefaultVMExperimentFlags())
                 .withES6Promise(vm::RuntimeConfig::getDefaultES6Promise())
@@ -49,6 +67,10 @@ struct ReplWrapper : facebook::jni::HybridClass<ReplWrapper> {
 
     static jni::local_ref<ReplWrapper::jhybriddata> initHybrid(jni::alias_ref<jclass>) {
         return makeCxxInstance();
+    }
+
+    void nativeCollect(facebook::jni::alias_ref<facebook::jni::JString> jCause) {
+        mRuntime->collect(jCause->toStdString());
     }
 
     std::string nativeEvalScript(facebook::jni::alias_ref<facebook::jni::JString> jScript) {
