@@ -226,7 +226,7 @@ set(HERMES_MSVC_MP ON CACHE STRING
 set(EMSCRIPTEN_FASTCOMP ON CACHE BOOL
   "Emscripten is using the fastcomp backend instead of the LLVM one")
 
-set(HERMES_ENABLE_INTL OFF CACHE BOOL
+set(HERMES_ENABLE_INTL ON CACHE BOOL
   "Enable JS Intl support (WIP)")
 
 set(HERMES_ENABLE_TEST_SUITE ON CACHE BOOL
